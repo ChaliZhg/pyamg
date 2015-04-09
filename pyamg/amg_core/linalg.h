@@ -2,6 +2,9 @@
 #define LINALG_H
 
 #include <math.h>
+#include <cmath>
+#include <cstdlib>
+#include <complex>
 #include <limits>
 
 /*******************************************************************
@@ -156,8 +159,8 @@ inline T dot_prod(const T x[], const T y[], const I n)
  * normx = sqrt( <x, x> )
  *
  */
-template<class I, class T, class F>
-inline void norm(const T x[], const I n, F &normx)
+template<class I, class T, class T2>
+inline void norm(const T x[], const I n, T2 &normx)
 {
     normx = sqrt(real(dot_prod(x,x,n)));
 }
@@ -490,8 +493,8 @@ inline void gemm(const T Ax[], const I Arows, const I Acols, const char Atrans,
  *
  */
 
-template<class I, class T, class F>
-I svd_jacobi (const T Ax[], T Tx[], T Bx[], F Sx[], const I m, const I n)
+template<class I, class T, class T2>
+I svd_jacobi (const T Ax[], T Tx[], T Bx[], T2 Sx[], const I m, const I n)
 {
     // Not implemented for m < n matrices
     if( m < n)
@@ -501,12 +504,12 @@ I svd_jacobi (const T Ax[], T Tx[], T Bx[], F Sx[], const I m, const I n)
     const T * A = Ax;
     T * U = Tx;
     T * V = Bx;
-    F * S = Sx;
+    T2 * S = Sx;
     
     // Hard code fast 1x1 SVD
     if ( (n==1) && (m==1) )
     {
-        F normA = mynorm(A[0]);
+        T2 normA = mynorm(A[0]);
 
         V[0] = 1.0;
         S[0] = normA; 
@@ -521,7 +524,7 @@ I svd_jacobi (const T Ax[], T Tx[], T Bx[], F Sx[], const I m, const I n)
     // Workspace
     I i, j, k;
     I nsq = n*n;
-    F normx;
+    T2 normx;
 
     // Initialize the rotation counter and the sweep counter.
     I count = 1;
@@ -530,7 +533,7 @@ I svd_jacobi (const T Ax[], T Tx[], T Bx[], F Sx[], const I m, const I n)
     // Always do at least  30 sweeps
     I sweepmax = std::max(15*n, 30);
 
-    F tolerance = sqrt((F)m)*std::numeric_limits<F>::epsilon();
+    T2 tolerance = sqrt((T2)m)*std::numeric_limits<T2>::epsilon();
 
     // Set V to the identity matrix
     for(i = 0; i < nsq; i++)
@@ -547,7 +550,7 @@ I svd_jacobi (const T Ax[], T Tx[], T Bx[], F Sx[], const I m, const I n)
     {
         // S[j] = eps*norm(A[:,j])
         norm(&(U[j*m]), m, normx);
-        S[j] = std::numeric_limits<F>::epsilon()*normx;
+        S[j] = std::numeric_limits<T2>::epsilon()*normx;
     }
   
     // Orthogonalize U by plane rotations.
@@ -565,14 +568,14 @@ I svd_jacobi (const T Ax[], T Tx[], T Bx[], F Sx[], const I m, const I n)
 
             for (k = j + 1; k < n; k++)
             {
-                F cos, abserr_a, abserr_b;
+                T2 cos, abserr_a, abserr_b;
                 T sin, neg_conj_sin;
                 I sorted, orthog, noisya, noisyb;
 
-                F a; norm(&(U[jm]), m, a);              // || U[:,j] ||
-                F b; norm(&(U[km]), m, b);              // || U[:,k] ||
+                T2 a; norm(&(U[jm]), m, a);              // || U[:,j] ||
+                T2 b; norm(&(U[km]), m, b);              // || U[:,k] ||
                 T d = dot_prod(&(U[jm]), &(U[km]), m);  // <U[:,j], U[:,k]>
-                F norm_d = mynorm(d);
+                T2 norm_d = mynorm(d);
 
                 // test for columns j,k orthogonal, or dominant errors 
                 abserr_a = S[j];
@@ -639,13 +642,13 @@ I svd_jacobi (const T Ax[], T Tx[], T Bx[], F Sx[], const I m, const I n)
                     // calculate rotation angles for 
                     // jacobi_rot = [cos          sin]
                     //              [-conj(sin)   cos]
-                    F tau = (b*b - a*a)/(2.0*norm_d);
-                    F t = signof(tau)/(fabs(tau) + sqrt(1.0 + tau*tau));
+                    T2 tau = (b*b - a*a)/(2.0*norm_d);
+                    T2 t = signof(tau)/(fabs(tau) + sqrt(1.0 + tau*tau));
                     cos = 1.0/(sqrt(1.0 + t*t));
                     sin = d*(t*cos/norm_d);
                     neg_conj_sin = conjugate(sin)*-1.0;
                 
-                    F norm_sin = mynorm(sin);
+                    T2 norm_sin = mynorm(sin);
                     S[j] = fabs(cos)*abserr_a + norm_sin*abserr_b;
                     S[k] =  norm_sin*abserr_a + fabs(cos)*abserr_b;
 
@@ -692,19 +695,19 @@ I svd_jacobi (const T Ax[], T Tx[], T Bx[], F Sx[], const I m, const I n)
     }// end while loop
 
     // Orthogonalization complete. Compute singular values.
-    F sigma_tol=0.0;
+    T2 sigma_tol=0.0;
     I Uoffset = 0;
     I iszero = n;
     for (j = 0; j < n; j++)
     {
-        F curr_norm;
+        T2 curr_norm;
         norm(&(U[Uoffset]), m, curr_norm);              // || U[:,j] ||
         
         if(j == 0)
         {
             // For j==0, curr_norm is sigma_max
-            F alpha = 50.0/sqrt(sqrt(std::numeric_limits<F>::epsilon()));
-            sigma_tol = alpha*curr_norm*std::numeric_limits<F>::epsilon();
+            T2 alpha = 50.0/sqrt(sqrt(std::numeric_limits<T2>::epsilon()));
+            sigma_tol = alpha*curr_norm*std::numeric_limits<T2>::epsilon();
         }
 
         // Determine if singular value is zero
@@ -780,8 +783,8 @@ I svd_jacobi (const T Ax[], T Tx[], T Bx[], F Sx[], const I m, const I n)
  * efficient multiple calls to this routine
  *
  */
-template<class I, class T, class F>
-void svd_solve( T Ax[], I m, I n, T b[], F sing_vals[], T work[], I work_size)
+template<class I, class T, class T2>
+void svd_solve( T Ax[], I m, I n, T b[], T2 sing_vals[], T work[], I work_size)
 {
     I mn = m*n;
     // Rename
@@ -865,7 +868,7 @@ void svd_solve( T Ax[], I m, I n, T b[], F sing_vals[], T work[], I work_size)
  * >>> print "A holds the inverse of the transpose\n" + str(dot(A[0], Ac[0].T))
  *
  */
-template<class I, class T, class F>
+template<class I, class T, class T2>
 void pinv_array(T Ax[], const I m, const I n, const char TransA)
 {
     I nsq = n*n;
@@ -874,7 +877,7 @@ void pinv_array(T Ax[], const I m, const I n, const char TransA)
     T * U = new T[nsq];
     T * V = new T[nsq];
     T * SinvUh = new T[nsq];
-    F * S = new F[n];
+    T2 * S = new T2[n];
     const char t = 'F';
 
     for(I i = 0; i < m; i++)
